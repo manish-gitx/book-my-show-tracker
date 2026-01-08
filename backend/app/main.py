@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 from app.database import get_db, init_db
 from app.routers import subscriptions, theaters, movies
 from app.services.scheduler import start_scheduler, stop_scheduler
-from app.services.telegram_bot import telegram_bot
 from app.core.config import settings
 
 @asynccontextmanager
@@ -16,21 +15,16 @@ async def lifespan(app: FastAPI):
     init_db()
     start_scheduler()
     
-    # Start Telegram bot if configured
-    if settings.TELEGRAM_BOT_TOKEN:
-        await telegram_bot.start_bot()
-        print("Telegram bot started")
+    # Email notifications are now active
+    if settings.brevo_api_key:
+        print("✅ Email notification service configured and ready (Brevo API)")
     else:
-        print("Telegram bot not configured - missing TELEGRAM_BOT_TOKEN")
+        print("⚠️  Warning: Email notification not configured - set BREVO_API_KEY in .env")
     
     yield
     
     # Shutdown
     stop_scheduler()
-    
-    # Stop Telegram bot
-    if settings.TELEGRAM_BOT_TOKEN:
-        await telegram_bot.stop_bot()
 
 app = FastAPI(
     title="BookMyShow Movie Tracker",

@@ -6,23 +6,23 @@ import { Bell, Trash2, Calendar, MapPin, Film, Search } from 'lucide-react';
 import { getUserSubscriptions, deleteSubscription } from '../services/api';
 
 const Subscriptions = () => {
-  const [telegramId, setTelegramId] = useState('');
+  const [email, setEmail] = useState('');
   const queryClient = useQueryClient();
   
   const searchForm = useForm();
 
   const { data: subscriptions = [], isLoading, error } = useQuery(
-    ['subscriptions', telegramId],
-    () => getUserSubscriptions(telegramId),
+    ['subscriptions', email],
+    () => getUserSubscriptions(email),
     {
-      enabled: !!telegramId,
+      enabled: !!email,
       refetchInterval: 30000, // Refetch every 30 seconds
     }
   );
 
   const deleteMutation = useMutation(deleteSubscription, {
     onSuccess: () => {
-      queryClient.invalidateQueries(['subscriptions', telegramId]);
+      queryClient.invalidateQueries(['subscriptions', email]);
       toast.success('Subscription deleted successfully!');
     },
     onError: (error) => {
@@ -31,7 +31,7 @@ const Subscriptions = () => {
   });
 
   const handleSearch = (data) => {
-    setTelegramId(data.telegram_id);
+    setEmail(data.email);
   };
 
   const handleDelete = (subscriptionId, movieName) => {
@@ -58,7 +58,7 @@ const Subscriptions = () => {
       </div>
 
       {/* Search Section */}
-      {!telegramId && (
+      {!email && (
         <div className="card max-w-md mx-auto">
           <div className="text-center space-y-4">
             <Search className="h-12 w-12 text-primary-600 mx-auto" />
@@ -66,19 +66,26 @@ const Subscriptions = () => {
               Find Your Subscriptions
             </h2>
             <p className="text-gray-600">
-              Enter your Telegram ID to view your subscriptions
+              Enter your email to view your subscriptions
             </p>
             
             <form onSubmit={searchForm.handleSubmit(handleSearch)} className="space-y-4">
               <div>
                 <input
-                  {...searchForm.register('telegram_id', { required: 'Telegram ID is required' })}
+                  {...searchForm.register('email', { 
+                    required: 'Email is required',
+                    pattern: {
+                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                      message: 'Invalid email address'
+                    }
+                  })}
+                  type="email"
                   className="input"
-                  placeholder="Your Telegram ID"
+                  placeholder="your.email@example.com"
                 />
-                {searchForm.formState.errors.telegram_id && (
+                {searchForm.formState.errors.email && (
                   <p className="text-red-500 text-sm mt-1">
-                    {searchForm.formState.errors.telegram_id.message}
+                    {searchForm.formState.errors.email.message}
                   </p>
                 )}
               </div>
@@ -86,29 +93,25 @@ const Subscriptions = () => {
                 Search Subscriptions
               </button>
             </form>
-            
-            <p className="text-sm text-gray-500">
-              Don't know your Telegram ID? Message @userinfobot on Telegram
-            </p>
           </div>
         </div>
       )}
 
       {/* Results Section */}
-      {telegramId && (
+      {email && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold text-gray-900">
-              Subscriptions for ID: {telegramId}
+              Subscriptions for: {email}
             </h2>
             <button
               onClick={() => {
-                setTelegramId('');
+                setEmail('');
                 searchForm.reset();
               }}
               className="btn-outline"
             >
-              Search Different ID
+              Search Different Email
             </button>
           </div>
 
@@ -222,7 +225,7 @@ const Subscriptions = () => {
                 <Bell className="h-8 w-8 mx-auto mb-2" />
                 <p className="font-medium">Notifications Active</p>
                 <p className="text-sm">
-                  You'll receive Telegram notifications when movies become available or new showtimes are added.
+                  You'll receive email notifications when movies become available or new showtimes are added.
                 </p>
               </div>
             </div>

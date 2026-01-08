@@ -7,14 +7,155 @@ from app.database import get_db
 from app.models import User, Theater, UserSubscription
 from app.services.parser import BookMyShowParser
 from app.services.scraper import ScrapingService
+from app.services.movie_tracker import MovieComparisonService
+from app.services.email_service import email_service
+import asyncio
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
+
+# Test endpoint for email
+class TestEmailRequest(BaseModel):
+    to_email: str
+
+@router.post("/test-email")
+async def test_email(request: TestEmailRequest):
+    """Send a test email to verify configuration"""
+    success = await email_service.send_email_async(
+        recipient_email=request.to_email,
+        subject="🎬 Test Email - BookMyShow Tracker",
+        message="Hello! This is a test email from your BookMyShow Movie Tracker.\n\nIf you receive this, your email configuration is working correctly! 🎉"
+    )
+    
+    if success:
+        return {
+            "success": True,
+            "message": f"Test email sent successfully to {request.to_email}",
+            "note": "Check your inbox (and spam folder)"
+        }
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to send test email. Check server logs for details."
+        )
+
+async def send_subscription_confirmation(
+    user_email: str, 
+    movie_name: str, 
+    bms_url: str, 
+    theater_name: str, 
+    target_date: date
+):
+    """
+    Send immediate confirmation email when subscription is created.
+    Checks if movie already exists or not.
+    """
+    try:
+        # Scrape the theater to check current availability
+        scraping_service = ScrapingService()
+        result = await scraping_service.scrape_and_update_theater(bms_url)
+        scraping_service.cleanup()
+        
+        if not result['success']:
+            # If scraping fails, send generic confirmation
+            message = f"""🎬 Subscription Created Successfully!
+
+Thank you for subscribing to track '{movie_name}' at {theater_name} on {target_date.strftime('%B %d, %Y')}.
+
+We'll check for availability and notify you as soon as we have updates!
+
+⏱️ We check for new movies and showtimes every 2 minutes.
+📧 You'll receive an email when:
+  • The movie becomes available
+  • New showtimes are added
+
+✅ Your subscription is now active and monitoring!"""
+            
+            await email_service.send_email_async(
+                user_email,
+                "🎬 Subscription Confirmed - Movie Tracking Active",
+                message
+            )
+            return
+        
+        # Use MovieComparisonService to find matching movies
+        from app.database import SessionLocal
+        temp_db = SessionLocal()
+        try:
+            comparison_service = MovieComparisonService(temp_db)
+            matching_movies = comparison_service.find_matching_movies(
+                movie_name, 
+                result['data']['movies'],
+                threshold=70
+            )
+            
+            if matching_movies:
+                # Movie already exists!
+                matched_movie = matching_movies[0]
+                showtimes_str = ", ".join([show['time'] for show in matched_movie['showtimes']])
+                
+                message = f"""🎬 Great News! Movie Already Available!
+
+'{matched_movie['title']}' is ALREADY showing at {theater_name}!
+
+📅 Date: {target_date.strftime('%B %d, %Y')}
+🎭 Theater: {theater_name}
+🗣️ Language: {matched_movie['language']}
+⭐ Rating: {matched_movie['rating']}
+🕐 Available Showtimes: {showtimes_str}
+
+🎟️ You can book your tickets right now on BookMyShow!
+
+📢 Don't worry, we'll keep monitoring:
+  • We'll notify you if NEW showtimes are added
+  • We'll alert you if the movie schedule changes
+
+✅ Your subscription is active and watching for updates!
+
+Happy watching! 🍿"""
+                
+                await email_service.send_email_async(
+                    user_email,
+                    f"✅ '{matched_movie['title']}' is Available Now!",
+                    message
+                )
+            else:
+                # Movie doesn't exist yet
+                message = f"""🎬 Subscription Activated - Movie Not Available Yet
+
+Thank you for subscribing to track '{movie_name}'!
+
+📅 Target Date: {target_date.strftime('%B %d, %Y')}
+🎭 Theater: {theater_name}
+
+📊 Current Status: The movie is not yet showing at this theater on this date.
+
+🔔 We'll notify you immediately when:
+  • The movie becomes available
+  • Showtimes are added to the schedule
+
+⏱️ We're checking every 2 minutes, so you'll be among the first to know!
+
+✅ Your subscription is active. Sit back and relax - we've got this covered!
+
+We'll send you an email as soon as '{movie_name}' appears in the schedule. 📧"""
+                
+                await email_service.send_email_async(
+                    user_email,
+                    f"🔔 Tracking '{movie_name}' - We'll Notify You!",
+                    message
+                )
+        finally:
+            temp_db.close()
+            
+    except Exception as e:
+        print(f"Error sending confirmation email: {e}")
+        # Don't fail the subscription creation if email fails
 
 # Pydantic models
 class SubscriptionCreate(BaseModel):
     bms_url: str
     movie_name: str
-    telegram_id: str
+    email: str
     notify_new_shows: bool = True
     notify_new_times: bool = True
 
@@ -75,9 +216,9 @@ async def create_subscription(
         url_info = parser.parse_bms_url(subscription.bms_url)
         
         # Get or create user
-        user = db.query(User).filter(User.telegram_id == subscription.telegram_id).first()
+        user = db.query(User).filter(User.email == subscription.email).first()
         if not user:
-            user = User(telegram_id=subscription.telegram_id)
+            user = User(email=subscription.email)
             db.add(user)
             db.flush()
         
@@ -118,6 +259,17 @@ async def create_subscription(
                 db.commit()
                 db.refresh(existing)
                 
+                ##Send confirmation email for reactivated subscription
+                asyncio.create_task(
+                    send_subscription_confirmation(
+                        subscription.email,
+                        subscription.movie_name,
+                        subscription.bms_url,
+                        existing.theater.name,
+                        target_date
+                    )
+                )
+                
                 return SubscriptionResponse(
                     id=existing.id,
                     movie_name=existing.movie_name,
@@ -144,6 +296,17 @@ async def create_subscription(
         db.commit()
         db.refresh(new_subscription)
         
+        # Send immediate confirmation email based on current availability
+        asyncio.create_task(
+            send_subscription_confirmation(
+                subscription.email,
+                subscription.movie_name,
+                subscription.bms_url,
+                theater.name,
+                target_date
+            )
+        )
+        
         return SubscriptionResponse(
             id=new_subscription.id,
             movie_name=new_subscription.movie_name,
@@ -161,10 +324,10 @@ async def create_subscription(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.get("/user/{telegram_id}", response_model=List[SubscriptionResponse])
-async def get_user_subscriptions(telegram_id: str, db: Session = Depends(get_db)):
+@router.get("/user/{email}", response_model=List[SubscriptionResponse])
+async def get_user_subscriptions(email: str, db: Session = Depends(get_db)):
     """Get all subscriptions for a user"""
-    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    user = db.query(User).filter(User.email == email).first()
     if not user:
         return []
     

@@ -49,7 +49,7 @@ const Home = () => {
     const subscriptionData = {
       bms_url: urlForm.getValues('url'),
       movie_name: data.movie_name,
-      telegram_id: data.telegram_id,
+      email: data.email,
       notify_new_shows: data.notify_new_shows,
       notify_new_times: data.notify_new_times
     };
@@ -84,7 +84,7 @@ const Home = () => {
             Real-time Notifications
           </h3>
           <p className="text-gray-600">
-            Get instant Telegram notifications when new movies or showtimes are added
+            Get instant email notifications when new movies or showtimes are added
           </p>
         </div>
         
@@ -253,20 +253,27 @@ const Home = () => {
 
               <div>
                 <label className="label text-gray-700 mb-2 block">
-                  Telegram ID
+                  Email Address
                 </label>
                 <input
-                  {...subscriptionForm.register('telegram_id', { required: 'Telegram ID is required' })}
+                  {...subscriptionForm.register('email', { 
+                    required: 'Email is required',
+                    pattern: {
+                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                      message: 'Invalid email address'
+                    }
+                  })}
+                  type="email"
                   className="input"
-                  placeholder="Your Telegram user ID"
+                  placeholder="your.email@example.com"
                 />
-                {subscriptionForm.formState.errors.telegram_id && (
+                {subscriptionForm.formState.errors.email && (
                   <p className="text-red-500 text-sm mt-1">
-                    {subscriptionForm.formState.errors.telegram_id.message}
+                    {subscriptionForm.formState.errors.email.message}
                   </p>
                 )}
                 <p className="text-sm text-gray-500 mt-1">
-                  Message @userinfobot on Telegram to get your ID
+                  You'll receive notifications at this email address
                 </p>
               </div>
 

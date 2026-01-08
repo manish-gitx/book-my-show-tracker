@@ -1,15 +1,18 @@
 # BookMyShow Movie Tracker
 
-A real-time movie show tracker that monitors BookMyShow for new shows and sends notifications via Telegram when movies become available or new showtimes are added.
+A real-time movie show tracker that monitors BookMyShow for new shows and sends notifications via **Gmail** when movies become available or new showtimes are added.
 
 ## Features
 
-- **Real-time Monitoring**: Checks every 2 minutes for new movies and showtimes
-- **Smart Movie Matching**: Partial name matching (e.g., "Demon Slayer" matches "Demon Slayer: Kimetsu no Yaiba Infinity Castle")
-- **Telegram Notifications**: Instant notifications when movies become available or new shows are added
-- **URL Parsing**: Automatically extracts theater and date information from BookMyShow URLs
-- **Web Interface**: Modern React frontend for managing subscriptions
-- **Test Scraping**: Built-in tool to test scraping functionality
+- **📧 Email Notifications**: Beautiful HTML email notifications sent via Gmail
+- **⚡ Instant Confirmation**: Get immediate feedback when creating subscriptions
+  - If movie exists: Email with current showtimes
+  - If movie doesn't exist: Confirmation that we're tracking it
+- **🔄 Real-time Monitoring**: Checks every 2 minutes for new movies and showtimes
+- **🎯 Smart Movie Matching**: Partial name matching (e.g., "Demon Slayer" matches "Demon Slayer: Kimetsu no Yaiba Infinity Castle")
+- **🌐 URL Parsing**: Automatically extracts theater and date information from BookMyShow URLs
+- **💻 Web Interface**: Modern React frontend for managing subscriptions
+- **🧪 Test Scraping**: Built-in tool to test scraping functionality
 
 ## Tech Stack
 
@@ -19,7 +22,7 @@ A real-time movie show tracker that monitors BookMyShow for new shows and sends 
 - **SQLAlchemy** - Database ORM
 - **Selenium** - Web scraping with Chrome WebDriver
 - **BeautifulSoup** - HTML parsing
-- **python-telegram-bot** - Telegram integration
+- **Gmail SMTP** - Email notifications
 - **SQLite** - Database (easily switchable to PostgreSQL)
 
 ### Frontend
@@ -55,16 +58,25 @@ A real-time movie show tracker that monitors BookMyShow for new shows and sends 
    pip install -r requirements.txt
    ```
 
-4. **Configure environment**
-   ```bash
-   cp env.example .env
-   # Edit .env with your configuration
+4. **Configure Gmail (for email notifications)**
+   
+   Create a `.env` file in the `backend` directory or update `backend/app/core/config.py`:
+   ```env
+   GMAIL_USERNAME=your.email@gmail.com
+   GMAIL_APP_PASSWORD=your-app-password
    ```
+   
+   **To get Gmail App Password:**
+   - Go to Google Account → Security → 2-Step Verification
+   - Scroll to "App passwords"
+   - Generate new password for "Mail"
+   - Use this password (not your regular Gmail password)
 
-5. **Create Telegram Bot**
-   - Message @BotFather on Telegram
-   - Create a new bot with `/newbot`
-   - Copy the bot token to your `.env` file
+5. **Run database migration (if upgrading from Telegram version)**
+   ```bash
+   cd backend
+   python migrate_to_email.py
+   ```
 
 6. **Run the backend**
    ```bash
@@ -113,23 +125,29 @@ Where:
 1. Paste a BookMyShow theater URL
 2. Confirm theater and date information
 3. Enter the movie name (partial matching supported)
-4. Provide your Telegram ID (get it from @userinfobot)
+4. Provide your email address
 5. Choose notification preferences
+6. **Get instant confirmation email** telling you:
+   - ✅ If movie is available now (with showtimes)
+   - 🔔 If we're tracking it for you (will notify when available)
 
-### Telegram Commands
+### Email Notifications
 
-- `/start` - Initialize the bot
-- `/help` - Show help information
-- `/subscribe` - Create a new subscription
-- `/list` - View your subscriptions
-- `/unsubscribe <ID>` - Remove a subscription
+You'll receive emails for:
+- **Immediate Confirmation**: Right after subscribing
+  - Movie already available → Shows current showtimes
+  - Movie not available yet → Confirms we're monitoring
+- **New Movie Added**: When your tracked movie becomes available
+- **New Showtimes**: When additional showtimes are added for your movie
+
+All emails are beautifully formatted HTML with complete information!
 
 ## API Endpoints
 
 ### Subscriptions
 - `POST /api/v1/subscriptions/parse-url` - Parse BookMyShow URL
-- `POST /api/v1/subscriptions/create` - Create subscription
-- `GET /api/v1/subscriptions/user/{telegram_id}` - Get user subscriptions
+- `POST /api/v1/subscriptions/create` - Create subscription (sends immediate confirmation email)
+- `GET /api/v1/subscriptions/user/{email}` - Get user subscriptions
 - `DELETE /api/v1/subscriptions/{id}` - Delete subscription
 - `POST /api/v1/subscriptions/test-scraping` - Test scraping
 

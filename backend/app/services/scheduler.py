@@ -9,7 +9,7 @@ from app.database import SessionLocal
 from app.models import UserSubscription, Theater
 from app.services.scraper import ScrapingService
 from app.services.movie_tracker import MovieComparisonService
-from app.services.telegram_bot import telegram_bot
+from app.services.email_service import email_service
 from app.core.config import settings
 
 class SchedulerService:
@@ -149,7 +149,7 @@ class SchedulerService:
     async def _process_notifications(self):
         """Process pending notifications"""
         try:
-            await telegram_bot.process_pending_notifications()
+            await email_service.process_pending_notifications()
         except Exception as e:
             print(f"Error processing notifications: {e}")
 

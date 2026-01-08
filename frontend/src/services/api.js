@@ -22,8 +22,8 @@ export const createSubscription = async (subscriptionData) => {
   return response.data;
 };
 
-export const getUserSubscriptions = async (telegramId) => {
-  const response = await api.get(`/subscriptions/user/${telegramId}`);
+export const getUserSubscriptions = async (email) => {
+  const response = await api.get(`/subscriptions/user/${email}`);
   return response.data;
 };
 

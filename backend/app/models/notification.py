@@ -11,7 +11,7 @@ class Notification(Base):
     message = Column(Text, nullable=False)
     notification_type = Column(String, nullable=False)  # 'new_movie', 'new_showtime', 'movie_removed'
     is_sent = Column(Boolean, default=False)
-    sent_via = Column(String, nullable=True)  # 'telegram', 'whatsapp'
+    sent_via = Column(String, nullable=True)  # 'email'
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     sent_at = Column(DateTime(timezone=True), nullable=True)
     
